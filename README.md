@@ -3,6 +3,8 @@
 # Clone whole repository:
 
   git clone `<repo URL>`
+  
+  cd yocto
 
   git submodule init
 
