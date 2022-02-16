@@ -2,7 +2,7 @@
 
 # Clone whole repository:
 
-  git clone "<repo URL>"
+  git clone `<repo URL>`
 
   git submodule init
 
