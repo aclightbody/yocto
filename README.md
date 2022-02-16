@@ -1,8 +1,14 @@
-# yocto projects
-# To build the project:
+yocto projects
 
-# cd yocto
-# source poky/oe-init-build-env <project name>
-# e.g. source poky/oe-init-build-env build-rpi-lab3
-# bitbake -c clean rpi-test-image
-# bitbake rpi-test-image
+Clone whole repository:
+git clone <repo URL>
+git submodule init
+git submodule update
+
+To build the project:
+cd <yocto path>
+source poky/oe-init-build-env <project name>
+e.g. source poky/oe-init-build-env build-rpi-lab3
+bitbake -c clean rpi-test-image
+bitbake rpi-test-image
+  
