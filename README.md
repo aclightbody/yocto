@@ -10,7 +10,7 @@
 
 # To build the project:
 
-  cd "<yocto path>"
+  cd "</yocto path>/"
   
   source poky/oe-init-build-env <project name>
 
