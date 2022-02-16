@@ -2,7 +2,7 @@
 
 # Clone whole repository:
 
-  git clone <repo URL>
+  git clone "<repo URL>"
 
   git submodule init
 
@@ -10,7 +10,7 @@
 
 # To build the project:
 
-  cd <yocto path>
+  cd "<yocto path>"
   
   source poky/oe-init-build-env <project name>
 
