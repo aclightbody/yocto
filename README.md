@@ -2,7 +2,9 @@ yocto projects
 
 Clone whole repository:
 git clone <repo URL>
+  
 git submodule init
+  
 git submodule update
 
 To build the project:
