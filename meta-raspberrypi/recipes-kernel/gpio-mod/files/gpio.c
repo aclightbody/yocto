@@ -10,10 +10,10 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 
-#define GPIO_OUT 20 // GPIO20
-#define GPIO_IN 21  // GPIO21static
+#define GPIO_OUT 20 /* GPIO20 */
+#define GPIO_IN 21  /* GPIO21 */
 
-dev_t gpio_dev;
+static dev_t gpio_dev;
 struct cdev gpio_cdev;
 static int gpio_lock = 0;
 volatile char gpio_in_value = 0;
