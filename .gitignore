@@ -3,3 +3,4 @@ downloads/
 sstate-cache/
 tmp/
 *.log
+bitbake.lock
