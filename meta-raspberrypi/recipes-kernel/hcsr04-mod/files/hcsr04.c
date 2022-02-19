@@ -72,7 +72,7 @@ static int __init hcsr04_module_init(void)
 
 static void __exit hcsr04_module_cleanup(void)
 {
-    printk(KERN_INFO "Cleaning-up hcsr04_dev.\n");
+    printk(KERN_INFO "Cleaning-up hcsr04_dev\n");
 
     /* Release GPIOs */
     gpio_free(GPIO_OUT);
@@ -139,7 +139,7 @@ ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f
     printk(KERN_INFO "hcsr04 read (count=%d, offset=%d)\n", (int)count, (int)*f_pos);
 
     pulse = (int)ktime_to_us(ktime_sub(falling, rising)); /* Pulse duration (cast to int) = falling - rising */
-    printk(KERN_INFO "hcsr04_dev: %s pulse duration (us) %d, pulse distance: %f\n", __func__, pulse, pulse/58.0);
+    //printk(KERN_INFO "hcsr04_dev: %s pulse duration (us) %d, pulse distance (cm): %f\n", __func__, pulse, pulse/58.0);
     ret = copy_to_user(buf, &pulse, 4);                   /* Copy pulse duration to user space as 4 bytes */
 
     return 4; /* 4 bytes are returned */
