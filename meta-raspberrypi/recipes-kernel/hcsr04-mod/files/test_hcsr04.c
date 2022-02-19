@@ -19,7 +19,7 @@ int main(int argc, char **argv)
     write(fd, &c, 1); /* Write system call triggers sensor. Written value c here is meaningless. 1 byte */
     read(fd, &d, 4); /* Read system call stores echo pulse duration in 4 bytes */
 
-    printf("%d: %f\n", d, d / 58.0); /* Display duration and corresponding distance */
+    printf("Duration (us): %d,Distance (cm): %f\n", d, d/58.0); /* Display duration (microseconds) and corresponding distance (cm) */
     close(fd); /* Close device file */
 
     return 0;
