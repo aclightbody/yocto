@@ -48,7 +48,7 @@ static int __init hcsr04_module_init(void)
 {
     char buffer[64];
 
-    printk(KERN_INFO "Loading hcsr04_module\n");
+    // printk(KERN_INFO "Loading hcsr04_module\n");
 
     /* Insert character device into Linux Kernel */
     alloc_chrdev_region(&hcsr04_dev, 0, 1, "hcsr04_dev");
@@ -63,16 +63,44 @@ static int __init hcsr04_module_init(void)
     gpio_direction_output(GPIO_OUT, 0); /* Trig signal */
     gpio_direction_input(GPIO_IN);      /* Echo signal */
 
+    //  if (gpio_request(GPIO_OUT, "hcsr04_dev"))
+    // {
+    //     printk(KERN_INFO "hcsr04_dev: %s unable to get GPIO_OUT\n", __func__);
+    //     ret = -EBUSY;
+    //     goto Done;
+    // }
+    // if (gpio_request(GPIO_IN, "hcsr04_dev"))
+    // {
+    //     printk(KERN_INFO "hcsr04_dev: %s unable to get GPIO_IN\n", __func__);
+    //     ret = -EBUSY;
+    //     goto Done;
+    // }
+    // if (gpio_direction_output(GPIO_OUT, 0) < 0)
+    // {
+    //     printk(KERN_INFO "hcsr04_dev: %s unable to set GPIO_OUT as output\n", __func__);
+    //     ret = -EBUSY;
+    //     goto Done;
+    // }
+    // if (gpio_direction_input(GPIO_IN) < 0)
+    // {
+    //     printk(KERN_INFO "hcsr04_dev: %s unable to set GPIO_IN as input\n", __func__);
+    //     ret = -EBUSY;
+    //     goto Done;
+    // }
+
     /* sysfs */
     hcsr04_kobject = kobject_create_and_add("hcsr04", kernel_kobj); /* Add hcsr04 directory in /sys/kernel */
     sysfs_create_file(hcsr04_kobject, &hcsr04_attribute.attr);      /* Add hcsr04 file in /sys/kernel/hcsr04 */
 
     return 0;
+
+    // Done:
+    //     return ret;
 }
 
 static void __exit hcsr04_module_cleanup(void)
 {
-    printk(KERN_INFO "Cleaning-up hcsr04_dev\n");
+    // printk(KERN_INFO "Cleaning-up hcsr04_dev\n");
 
     /* Release GPIOs */
     gpio_free(GPIO_OUT);
@@ -93,19 +121,20 @@ int hcsr04_open(struct inode *inode, struct file *file)
 {
     int ret = 0;
 
-    printk(KERN_INFO "hcsr04_dev: %s\n", __func__);
+    // printk(KERN_INFO "hcsr04_dev: %s\n", __func__);
 
     /* Module lock control */
     if (hcsr04_lock > 0)
         ret = -EBUSY;
     else
         hcsr04_lock++;
+
     return (ret);
 }
 
 int hcsr04_close(struct inode *inode, struct file *file)
 {
-    printk(KERN_INFO "hcsr04_dev: %s\n", __func__);
+    // printk(KERN_INFO "hcsr04_dev: %s\n", __func__);
     hcsr04_lock = 0;
     return (0);
 }
@@ -121,12 +150,13 @@ ssize_t hcsr04_write(struct file *filp, const char *buffer, size_t length, loff_
     while (gpio_get_value(GPIO_IN) == 0)
         ;                 /* Wait while input is 0 */
     rising = ktime_get(); /* When input is 1 (rising edge) get the time stamp */
-    printk(KERN_INFO "hcsr04_dev: %s got rising timestamp %d from GPIO_IN\n", __func__, (int)rising);
+    /* Can't put any code between rising and falling calls, as it delays function calls and therefore readings */
 
     while (gpio_get_value(GPIO_IN) == 1)
         ;                  /* Wait while input is 1 */
     falling = ktime_get(); /* When input is 0 (falling edge) get the time stamp */
-    printk(KERN_INFO "hcsr04_dev: %s got falling timestamp %d from GPIO_IN\n", __func__, (int)falling);
+    // printk(KERN_INFO "hcsr04_dev: %s got rising timestamp %lld from GPIO_IN\n", __func__, rising);
+    // printk(KERN_INFO "hcsr04_dev: %s got falling timestamp %lld from GPIO_IN\n", __func__, falling);
 
     return (1);
 }
@@ -136,11 +166,11 @@ ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f
     int ret;
     int pulse;
 
-    printk(KERN_INFO "hcsr04 read (count=%d, offset=%d)\n", (int)count, (int)*f_pos);
+    // printk(KERN_INFO "hcsr04 read (count=%d, offset=%d)\n", (int)count, (int)*f_pos);
 
     pulse = (int)ktime_to_us(ktime_sub(falling, rising)); /* Pulse duration (cast to int) = falling - rising */
-    //printk(KERN_INFO "hcsr04_dev: %s pulse duration (us) %d, pulse distance (cm): %f\n", __func__, pulse, pulse/58.0);
-    ret = copy_to_user(buf, &pulse, 4);                   /* Copy pulse duration to user space as 4 bytes */
+    // printk(KERN_INFO "hcsr04_dev: %s pulse duration (us) %d, pulse distance (cm): %d\n", __func__, pulse, pulse/58);
+    ret = copy_to_user(buf, &pulse, 4);                   /* Copy pulse duration to user space as 4 bytes (32 bits) */
 
     return 4; /* 4 bytes are returned */
 }
