@@ -12,6 +12,9 @@
 #include <linux/sysfs.h>
 #include <linux/kobject.h>
 #include <asm/delay.h>
+#include <linux/ktime.h>
+#include <linux/timekeeping.h>
+#include <linux/time.h>
 
 #define GPIO_OUT 24 /* Trigger: GPIO24 */
 #define GPIO_IN 23  /* Echo: GPIO23 */
@@ -27,12 +30,13 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 static ssize_t hcsr04_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count);
 
 /* Definitions */
+static int hcsr04 = 2; /* sys file variable */
 static dev_t hcsr04_dev;
 struct cdev hcsr04_cdev;    /* Data structure for character-communication-based device */
 static int hcsr04_lock = 0; /* Access lock to hcsr04 device */
 static struct kobject *hcsr04_kobject;
 static ktime_t rising, falling; /* Data structures to record rising and falling edge of echo pulse of hcsr04 device */
-static struct kobj_attribute hcsr04_attribute = __ATTR(hcsr04, 0660, hcsr04_show, hcsr04_store); /* Kernel object attribute: _ATTR(filename,file access right, invoked function when file read, invoked function when file written) */
+static struct kobj_attribute hcsr04_attribute = __ATTR(hcsr04, 0660, hcsr04_show, hcsr04_store); /* Kernel object attribute: _ATTR(filename,file access right (0666 is read write execute access), invoked function when file read, invoked function when file written) */
 
 /* VFS file operation APIs */
 struct file_operations hcsr04_fops =
@@ -178,13 +182,42 @@ ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 /* Function executed when the user reads /sys/kernel/hcsr04/hcsr04 */
 static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-    return sprintf(buf, "%d\n", (int)ktime_to_us(ktime_sub(falling, rising)));
+    int duration = 0;
+    int distance = 0;
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int min = 0;
+    int sec = 0;
+    struct timespec t;
+    struct tm time;
+    static ssize_t ret;
+
+    duration = (int)ktime_to_us(ktime_sub(falling, rising));
+    distance = duration / 58;
+    getnstimeofday(&t);
+    time64_to_tm(t.tv_sec, 0, &time);
+    year = 1900 + time.tm_year;
+    month = 1 + time.tm_mon;
+    day = time.tm_mday; /* day of the month */
+    hour = time.tm_hour;
+    min = time.tm_min;
+    sec = time.tm_sec;
+    // printk("%d:%d:%d:%ld\n", time.tm_hour, time.tm_min, time.tm_sec, t.tv_usec);
+    ret = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d\n", day, month, year, hour, min, sec, duration, distance); /* Floating point operations are discouraged in Linux kernel */
+
+    return ret;
+    // return sprintf(buf, "%d\n", hcsr04);
 }
 
 /* Function executed when the user writes /sys/kernel/hcsr04/hcsr04 */
 static ssize_t hcsr04_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
-    return 1;
+    // hcsr04 = (int)ktime_to_us(ktime_sub(falling, rising));
+    // sscanf(buf, "%d\n", &hcsr04);
+
+    return count;
 }
 
 module_init(hcsr04_module_init);
