@@ -30,7 +30,7 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 static ssize_t hcsr04_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count);
 
 /* Definitions */
-static int hcsr04 = 2; /* sys file variable */
+// static int hcsr04 = 2; /* sys file variable */
 static dev_t hcsr04_dev;
 struct cdev hcsr04_cdev;    /* Data structure for character-communication-based device */
 static int hcsr04_lock = 0; /* Access lock to hcsr04 device */
@@ -55,8 +55,8 @@ static int __init hcsr04_module_init(void)
     // printk(KERN_INFO "Loading hcsr04_module\n");
 
     /* Insert character device into Linux Kernel */
-    alloc_chrdev_region(&hcsr04_dev, 0, 1, "hcsr04_dev");
-    printk(KERN_INFO "%s\n", format_dev_t(buffer, hcsr04_dev));
+    alloc_chrdev_region(&hcsr04_dev, 0, 1, "hcsr04_dev"); /* Allocating major number for device */
+    printk(KERN_INFO "%s\n", format_dev_t(buffer, hcsr04_dev)); /* Print major and minor number */
     cdev_init(&hcsr04_cdev, &hcsr04_fops);
     hcsr04_cdev.owner = THIS_MODULE;
     cdev_add(&hcsr04_cdev, hcsr04_dev, 1);
