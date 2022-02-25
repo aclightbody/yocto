@@ -8,6 +8,8 @@ inherit module
 
 PR = "r0"
 
+# BPN: Bare Name of the recipe (i.e. the name of this recipe file without the version number)
+# SRC_URI = "file://Makefile file://${BPN}.c file://test_hcsr04.c"
 SRC_URI = "file://Makefile file://${BPN}.c"
 
 S = "${WORKDIR}"

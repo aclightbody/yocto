@@ -43,8 +43,9 @@ int main(int argc, char **argv)
 
     close(fd); /* Close device file */
 
+    return 0;
+
     err:
         printf("Incorrect argument input");
-
-    return 0;
+        return 0;
 }
