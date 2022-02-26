@@ -39,6 +39,7 @@ int main(int argc, char **argv)
         write(fd, &c, 1); /* Write system call triggers sensor. Written value c here is meaningless. 1 byte */
         read(fd, &d, 4); /* Read system call stores echo pulse duration in 4 bytes */
         printf("Duration (us): %d,Distance (cm): %f\n", d, d/58.0); /* Display duration (microseconds) and corresponding distance (cm) */
+        usleep(500000); /* Delay inserted, as the echo pulses seem to interfere with each other if in quick succession. 5x10^5 microseconds = 0.5s */
     }
 
     close(fd); /* Close device file */

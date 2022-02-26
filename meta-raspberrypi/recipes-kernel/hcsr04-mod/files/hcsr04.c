@@ -40,16 +40,8 @@ static struct kobj_attribute hcsr04_attribute = __ATTR(hcsr04, 0660, hcsr04_show
 #define CIRC_BUF_SIZE 5 /* Storing 5 echo values */
 static int circBufLen = 0; /* Indicates how many values are in buffer */
 static int circBufWrtIdx = 0;
-static int circBuf[CIRC_BUF_SIZE] = {0}; /* Circular buffer array */
+static int circBufPulse[CIRC_BUF_SIZE] = {0}; /* Circular buffer array */
 static struct timespec circBufTime[CIRC_BUF_SIZE] = {0}; /* Circular buffer array */
-static int year = 0;
-static int month = 0;
-static int day = 0;
-static int hour = 0;
-static int min = 0;
-static int sec = 0;
-static struct timespec t;
-static struct tm time;
 
 /* VFS file operation APIs */
 struct file_operations hcsr04_fops =
@@ -185,6 +177,9 @@ ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 
     int duration = 0;
     int distance = 0;
+    struct timespec t;
+    // int userArray[];
+
     // static ssize_t echo;
 
     // printk(KERN_INFO "Size of ssize_t is %d bytes in function %s\n", sizeof(ssize_t), __func__);
@@ -197,14 +192,7 @@ ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 
     /* Date calculation */
     getnstimeofday(&t);
-    // time64_to_tm(t.tv_sec, 0, &time);
-    // year = 1900 + time.tm_year;
-    // month = 1 + time.tm_mon;
-    // day = time.tm_mday; /* day of the month */
-    // hour = time.tm_hour;
-    // min = time.tm_min;
-    // sec = time.tm_sec;
-    
+
     // printk(KERN_INFO "hcsr04 read (count=%d, offset=%d)\n", (int)count, (int)*f_pos);
     // pulse = (int)ktime_to_us(ktime_sub(falling, rising)); /* Pulse duration (cast to int) = falling - rising */
     // printk(KERN_INFO "hcsr04_dev: %s pulse duration (us) %d, pulse distance (cm): %d\n", __func__, pulse, pulse/58);
@@ -215,7 +203,7 @@ ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f
     // echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d\n", day, month, year, hour, min, sec, duration, distance); /* Floating point operations are discouraged in Linux kernel */
     // printk(KERN_INFO "%s",buf);
 
-    circBuf[circBufWrtIdx] = duration;
+    circBufPulse[circBufWrtIdx] = duration;
     circBufTime[circBufWrtIdx] = t;
 
     /* Circular buffer for last 5 values */
@@ -244,62 +232,70 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 {
     // int duration = 0;
     // int distance = 0;
-    // int year = 0;
-    // int month = 0;
-    // int day = 0;
-    // int hour = 0;
-    // int min = 0;
-    // int sec = 0;
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int min = 0;
+    int sec = 0;
     // struct timespec t;
-    // struct tm time;
+    struct tm time;
     // static ssize_t echo;
+    ssize_t echo = 0;
+    int i;
+    int j;
+    int circBufDistInt[CIRC_BUF_SIZE]; /* Integer part */
+    int circBufDistDec[CIRC_BUF_SIZE]; /* Decimal part */
+
+    for (j=0;j<CIRC_BUF_SIZE;j++)
+    {
+        circBufDistInt[j] = circBufPulse[j]/58;
+        circBufDistDec[j] = ((1000*circBufPulse[j])/58)%1000; /* 3 decimal places */
+
+    }
 
     // // printk(KERN_INFO "Size of ssize_t is %d bytes in function %s\n", sizeof(ssize_t), __func__);
 
     // /* Date calculation */
     // duration = (int)ktime_to_us(ktime_sub(falling, rising));
     // distance = duration / 58;
-    // getnstimeofday(&t);
-    // time64_to_tm(t.tv_sec, 0, &time);
-    // year = 1900 + time.tm_year;
-    // month = 1 + time.tm_mon;
-    // day = time.tm_mday; /* day of the month */
-    // hour = time.tm_hour;
-    // min = time.tm_min;
-    // sec = time.tm_sec;
 
     // /* Date and echo duration and distance output */
     // // printk(KERN_INFO "%d:%d:%d:%ld\n", time.tm_hour, time.tm_min, time.tm_sec, t.tv_usec);
     // echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d\n", day, month, year, hour, min, sec, duration, distance); /* Floating point operations are discouraged in Linux kernel */
     // // printk(KERN_INFO "%s",buf);
-
-    // circBuf[circBufWrtIdx] = echo;
-
-    // /* Circular buffer for last 5 values */
-    // if (circBufLen >= CIRC_BUF_SIZE)
-    // {
-    //     circBufLen = CIRC_BUF_SIZE;/* Buffer full */
-    // }
-    // else
-    // {
-    //     circBufLen++;
-    // }
-
-    // circBufWrtIdx++;
    
-    // if (circBufWrtIdx == CIRC_BUF_SIZE)
-    // {
-    //     circBufWrtIdx = 0;
-    // }
-
-    int i;
-
-    for (i=0;i<5;i++)
+    for (i=0;i<CIRC_BUF_SIZE;i++)
     {
-        printk(KERN_INFO "%d",circBuf[i]);
+        // printk(KERN_INFO "%d\n",circBufPulse[i]); /* Pulse duration */
+        // printk(KERN_INFO "%d.%d\n", circBufDistInt[i],circBufDistDec[i]); /* Pulse distance */
+        
+        /* Time stamp */
+        time64_to_tm(circBufTime[i].tv_sec, 0, &time);
+        year = 1900 + time.tm_year;
+        month = 1 + time.tm_mon;
+        day = time.tm_mday; /* day of the month */
+        hour = time.tm_hour;
+        min = time.tm_min;
+        sec = time.tm_sec;
+        // printk(KERN_INFO "%d-%d-%d  %d:%d:%d\n", day, month, year, hour, min, sec);
+
+        if (i == 0)
+        {
+            echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", day, month, year, hour, min, sec, circBufPulse[i], circBufDistInt[i],circBufDistDec[i]);
+        }
+        else
+        {
+            echo += sprintf(buf + echo, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", day, month, year, hour, min, sec, circBufPulse[i], circBufDistInt[i],circBufDistDec[i]);
+        }
     }
 
-    return 1;
+// echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d \
+//     [%d-%d-%d, %d:%d:%d]\n Pulse duration (us): %d, Distance (cm): %d.%d\n",\
+//     10, 12, 2012, 11, 11, 11, 300, 5, 5,
+//     23, 2, 2022, 12, 00, 00, 500, 4, 4);
+
+    return echo;
     // return sprintf(buf, "%d\n", hcsr04);
 }
 
