@@ -238,9 +238,7 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
     int hour = 0;
     int min = 0;
     int sec = 0;
-    // struct timespec t;
     struct tm time;
-    // static ssize_t echo;
     ssize_t echo = 0;
     int i;
     int j;
