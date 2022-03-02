@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     char *dev_name = "/dev/hcsr04"; /* Assume module loaded and /dev/hcsr04 device file created */
     int fd = -1; /* Device file */
     char c;
-    int d;
+    int d[7];
     int i;
     int iterConv;
 
@@ -37,8 +37,10 @@ int main(int argc, char **argv)
     for (i=0; i<iter; i++)
     {
         write(fd, &c, 1); /* Write system call triggers sensor. Written value c here is meaningless. 1 byte */
-        read(fd, &d, 4); /* Read system call stores echo pulse duration in 4 bytes */
-        printf("Duration (us): %d,Distance (cm): %f\n", d, d/58.0); /* Display duration (microseconds) and corresponding distance (cm) */
+        // read(fd, &d, 4); /* Read system call stores echo pulse duration in 4 bytes */
+        read(fd, &d, 4*7);
+        // printf("Duration (us): %d,Distance (cm): %f\n", d, d/58.0); /* Display duration (microseconds) and corresponding distance (cm) */
+        printf("[%d-%d-%d | %d:%d:%d] Duration (us): %d, Distance (cm): %f\n", d[3], d[2], d[1], d[4], d[5], d[6], d[0], d[0]/58.0);
         usleep(500000); /* Delay inserted, as the echo pulses seem to interfere with each other if in quick succession. 5x10^5 microseconds = 0.5s */
     }
 

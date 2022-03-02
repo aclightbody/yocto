@@ -32,11 +32,11 @@ static ssize_t hcsr04_store(struct kobject *kobj, struct kobj_attribute *attr, c
 /* Declarations: circular buffer */ 
 typedef struct circular_buf_t circular_buf_t;
 typedef circular_buf_t* cbuf_handle_t; /* Pointer to circular buffer struct */
-cbuf_handle_t circular_buf_init(uint8_t* buffer, size_t size); 
+cbuf_handle_t circular_buf_init(int* buffer, size_t size); 
 void circular_buf_free(cbuf_handle_t me); 
 void circular_buf_reset(cbuf_handle_t me); 
-void circular_buf_put(cbuf_handle_t me, uint8_t data); 
-int circular_buf_get(cbuf_handle_t me, uint8_t * data);
+void circular_buf_put(cbuf_handle_t me, int data); 
+int circular_buf_get(cbuf_handle_t me, int * data);
 bool circular_buf_empty(cbuf_handle_t me); 
 bool circular_buf_full(cbuf_handle_t me); 
 size_t circular_buf_capacity(cbuf_handle_t me); 
@@ -51,24 +51,31 @@ static struct kobject *hcsr04_kobject;
 static ktime_t rising, falling; /* Data structures to record rising and falling edge of echo pulse of hcsr04 device */
 static struct kobj_attribute hcsr04_attribute = __ATTR(hcsr04, 0660, hcsr04_show, hcsr04_store); /* Kernel object attribute: _ATTR(filename,file access right (0666 is read write execute access), invoked function when file read, invoked function when file written) */
 #define CIRC_BUF_SIZE 5 /* Storing 5 echo values */
-static int circBufLen = 0; /* Indicates how many values are in buffer */
-static int circBufWrtIdx = 0;
-static int circBufPulse[CIRC_BUF_SIZE] = {0}; /* Circular buffer array */
-static struct timespec circBufTime[CIRC_BUF_SIZE] = {0}; /* Circular buffer array */
-static int showStartIdx = 0;
 
 /* Definitions: Circular buffer */
 struct circular_buf_t
 {
-	uint8_t* buffer; /* Data buffer */
+	int* buffer; /* Data buffer */
 	size_t head; /* Head pointer */
 	size_t tail; /* Tail pointer */
 	size_t max; /* Max size of the buffer in bytes */
 	bool full; /* Is the buffer full or not */
 };
 
-static uint8_t bufTest[CIRC_BUF_SIZE] = {0};
-static cbuf_handle_t handle = NULL;
+static int fifoBufPulse[CIRC_BUF_SIZE] = {0};
+static int fifoBufYear[CIRC_BUF_SIZE] = {0};
+static int fifoBufMonth[CIRC_BUF_SIZE] = {0};
+static int fifoBufDay[CIRC_BUF_SIZE] = {0};
+static int fifoBufHour[CIRC_BUF_SIZE] = {0};
+static int fifoBufMin[CIRC_BUF_SIZE] = {0};
+static int fifoBufSec[CIRC_BUF_SIZE] = {0};
+static cbuf_handle_t handlePulse = NULL;
+static cbuf_handle_t handleYear = NULL;
+static cbuf_handle_t handleMonth = NULL;
+static cbuf_handle_t handleDay = NULL;
+static cbuf_handle_t handleHour = NULL;
+static cbuf_handle_t handleMin = NULL;
+static cbuf_handle_t handleSec = NULL;
 
 /* VFS file operation APIs */
 struct file_operations hcsr04_fops =
@@ -82,13 +89,13 @@ struct file_operations hcsr04_fops =
 
 static inline size_t advance_headtail_value(size_t value, size_t max)
 {
-    printk(KERN_INFO "Value in: %d\n", value);
+    // printk(KERN_INFO "Value in: %d\n", value);
 	if(++value == max) /* pre-increment value */
 	{
-		printk(KERN_INFO "Value if max: %d\n", value);
+		// printk(KERN_INFO "Value if max: %d\n", value);
         value = 0;
 	}
-    printk(KERN_INFO "Value out: %d\n", value);
+    // printk(KERN_INFO "Value out: %d\n", value);
 
 	return value;
 }
@@ -97,22 +104,22 @@ static void advance_head_pointer(cbuf_handle_t me)
 {
 	if(circular_buf_full(me))
 	{
-        printk(KERN_INFO "tail value pre-advance: %d, address pointed to by tail pointer: %p, address of tail pointer: %p\n", me->tail, me->tail, &(me->tail));
+        // printk(KERN_INFO "tail index value pre-advance: %d, address pointed to by tail pointer: %p, address of tail pointer: %p\n", me->tail, me->tail, &(me->tail));
 		me->tail = advance_headtail_value(me->tail, me->max); /* If the buffer is full the tail pointer is advanced by 1 as well as the head pointer below */
-        printk(KERN_INFO "tail value post-advance: %d, address pointed to by tail pointer: %p, address of tail pointer: %p\n", me->tail, me->tail, &(me->tail));
+        // printk(KERN_INFO "tail index value post-advance: %d, address pointed to by tail pointer: %p, address of tail pointer: %p\n", me->tail, me->tail, &(me->tail));
     }
 
-    printk(KERN_INFO "head value pre-advance: %d, address pointed to by tail pointer: %p, address of head pointer: %p\n", me->head, me->head, &(me->head));
+    // printk(KERN_INFO "head index value pre-advance: %d, address pointed to by tail pointer: %p, address of head pointer: %p\n", me->head, me->head, &(me->head));
 	me->head = advance_headtail_value(me->head, me->max);
-    printk(KERN_INFO "head value post-advance: %d, address pointed to by tail pointer: %p, address of head pointer: %p\n", me->head, me->head, &(me->head));
+    // printk(KERN_INFO "head index value post-advance: %d, address pointed to by tail pointer: %p, address of head pointer: %p\n", me->head, me->head, &(me->head));
 	me->full = (me->head == me->tail); /* Tests to see whether buffer is full after the head has been advanced by 1 */
-    printk(KERN_INFO "Full: %d\n", me->full);
+    // printk(KERN_INFO "Full: %d\n", me->full);
 }
 
 /* 
 circular_buf_init: Pass in a storage buffer and size. Returns a circular buffer handle. 
 */
-cbuf_handle_t circular_buf_init(uint8_t* buffer, size_t size)
+cbuf_handle_t circular_buf_init(int* buffer, size_t size)
 {
 	cbuf_handle_t cbuf = kmalloc(sizeof(circular_buf_t),GFP_KERNEL);
 
@@ -122,7 +129,7 @@ cbuf_handle_t circular_buf_init(uint8_t* buffer, size_t size)
 
 	if(circular_buf_empty(cbuf))
     {
-        printk(KERN_INFO "Buffer empty\n");
+        // printk(KERN_INFO "Buffer empty\n");
     }
 
 	return cbuf;
@@ -179,7 +186,7 @@ size_t circular_buf_capacity(cbuf_handle_t me)
 /* 
 circular_buf_put:Put continues to add data if the buffer is full. Old data is overwritten. 
 */
-void circular_buf_put(cbuf_handle_t me, uint8_t data)
+void circular_buf_put(cbuf_handle_t me, int data)
 {
 	me->buffer[me->head] = data;
 
@@ -189,7 +196,7 @@ void circular_buf_put(cbuf_handle_t me, uint8_t data)
 /*  
 circular_buf_get: Retrieve a value from the buffer. Returns 0 on success, -1 if the buffer is empty 
 */
-int circular_buf_get(cbuf_handle_t me, uint8_t* data)
+int circular_buf_get(cbuf_handle_t me, int* data)
 {
     int r = -1;
 
@@ -226,7 +233,7 @@ Look ahead at values in buffer without removing data (gets a copy).
 look_ahead_counter: less than or equal to size of buffer (circular_buf_size())
 Values from tail to look_ahead_counter are inserted into data array of size look_ahead_counter.
 */
-int circular_buf_peek(cbuf_handle_t me, uint8_t* data, unsigned int look_ahead_counter)
+int circular_buf_peek(cbuf_handle_t me, int* data, unsigned int look_ahead_counter)
 {
 	int r = -1;
 	size_t pos;
@@ -267,41 +274,20 @@ static int __init hcsr04_module_init(void)
     gpio_direction_output(GPIO_OUT, 0); /* Trig signal */
     gpio_direction_input(GPIO_IN);      /* Echo signal */
 
-    //  if (gpio_request(GPIO_OUT, "hcsr04_dev"))
-    // {
-    //     printk(KERN_INFO "hcsr04_dev: %s unable to get GPIO_OUT\n", __func__);
-    //     ret = -EBUSY;
-    //     goto Done;
-    // }
-    // if (gpio_request(GPIO_IN, "hcsr04_dev"))
-    // {
-    //     printk(KERN_INFO "hcsr04_dev: %s unable to get GPIO_IN\n", __func__);
-    //     ret = -EBUSY;
-    //     goto Done;
-    // }
-    // if (gpio_direction_output(GPIO_OUT, 0) < 0)
-    // {
-    //     printk(KERN_INFO "hcsr04_dev: %s unable to set GPIO_OUT as output\n", __func__);
-    //     ret = -EBUSY;
-    //     goto Done;
-    // }
-    // if (gpio_direction_input(GPIO_IN) < 0)
-    // {
-    //     printk(KERN_INFO "hcsr04_dev: %s unable to set GPIO_IN as input\n", __func__);
-    //     ret = -EBUSY;
-    //     goto Done;
-    // }
-
     /* sysfs */
     hcsr04_kobject = kobject_create_and_add("hcsr04", kernel_kobj); /* Add hcsr04 directory in /sys/kernel */
     sysfs_create_file(hcsr04_kobject, &hcsr04_attribute.attr);      /* Add hcsr04 file in /sys/kernel/hcsr04 */
 
-    handle = circular_buf_init(bufTest,CIRC_BUF_SIZE);
+    handlePulse = circular_buf_init(fifoBufPulse,CIRC_BUF_SIZE);
+    handleYear = circular_buf_init(fifoBufYear,CIRC_BUF_SIZE);
+    handleMonth = circular_buf_init(fifoBufMonth,CIRC_BUF_SIZE);
+    handleDay = circular_buf_init(fifoBufDay,CIRC_BUF_SIZE);
+    handleHour = circular_buf_init(fifoBufHour,CIRC_BUF_SIZE);
+    handleMin = circular_buf_init(fifoBufMin,CIRC_BUF_SIZE);
+    handleSec = circular_buf_init(fifoBufSec,CIRC_BUF_SIZE);
+
 
     return 0;
-
-    // Done:
-    //     return ret;
 }
 
 static void __exit hcsr04_module_cleanup(void)
@@ -322,7 +308,13 @@ static void __exit hcsr04_module_cleanup(void)
     /* Remove hcsr04 directory from sysfs */
     kobject_put(hcsr04_kobject);
 
-    circular_buf_free(handle);
+    circular_buf_free(handlePulse);
+    circular_buf_free(handleYear);
+    circular_buf_free(handleMonth);
+    circular_buf_free(handleDay);
+    circular_buf_free(handleHour);
+    circular_buf_free(handleMin);
+    circular_buf_free(handleSec);
 }
 
 int hcsr04_open(struct inode *inode, struct file *file)
@@ -372,66 +364,9 @@ ssize_t hcsr04_write(struct file *filp, const char *buffer, size_t length, loff_
 ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
     int ret;
-    // int pulse;
-
     int duration = 0;
     int distance = 0;
     struct timespec t;
-    // int userArray[];
-
-    // static ssize_t echo;
-
-    // printk(KERN_INFO "Size of ssize_t is %d bytes in function %s\n", sizeof(ssize_t), __func__);
-
-    /* Date calculation */
-    duration = (int)ktime_to_us(ktime_sub(falling, rising)); /* Pulse duration (cast to int) = falling - rising */
-    // distance = duration / 58;
-
-    ret = copy_to_user(buf, &duration, 4);                   /* Copy pulse duration to user space as 4 bytes (32 bits) */
-
-    /* Date calculation */
-    getnstimeofday(&t);
-
-    // printk(KERN_INFO "hcsr04 read (count=%d, offset=%d)\n", (int)count, (int)*f_pos);
-    // pulse = (int)ktime_to_us(ktime_sub(falling, rising)); /* Pulse duration (cast to int) = falling - rising */
-    // printk(KERN_INFO "hcsr04_dev: %s pulse duration (us) %d, pulse distance (cm): %d\n", __func__, pulse, pulse/58);
-    // ret = copy_to_user(buf, &pulse, 4);                   /* Copy pulse duration to user space as 4 bytes (32 bits) */
-
-    /* Date and echo duration and distance output */
-    // printk(KERN_INFO "%d:%d:%d:%ld\n", time.tm_hour, time.tm_min, time.tm_sec, t.tv_usec);
-    // echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d\n", day, month, year, hour, min, sec, duration, distance); /* Floating point operations are discouraged in Linux kernel */
-    // printk(KERN_INFO "%s\n",buf);
-
-    circBufPulse[circBufWrtIdx] = duration;
-    circBufTime[circBufWrtIdx] = t;
-
-    /* FIFO circular buffer for last 5 values. Could do this with a linked list.*/
-
-    if (circBufLen >= CIRC_BUF_SIZE)
-    {
-        /* Buffer full */
-        showStartIdx = circBufWrtIdx;
-    }
-    else
-    {
-        circBufLen++;
-    }
-
-    circBufWrtIdx++;
-   
-    if (circBufWrtIdx >= CIRC_BUF_SIZE)
-    {
-        circBufWrtIdx = 0;
-    }
-
-    return 4; /* 4 bytes are returned */
-}
-
-/* Function executed when the user reads /sys/kernel/hcsr04/hcsr04 */
-static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
-{
-    // int duration = 0;
-    // int distance = 0;
     int year = 0;
     int month = 0;
     int day = 0;
@@ -439,78 +374,95 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
     int min = 0;
     int sec = 0;
     struct tm time;
+    int userArray[7];
+
+    // printk(KERN_INFO "Size of ssize_t is %d bytes in function %s\n", sizeof(ssize_t), __func__);
+
+    duration = (int)ktime_to_us(ktime_sub(falling, rising)); /* Pulse duration (cast to int) = falling - rising */
+    
+    /* Date calculation */
+    getnstimeofday(&t);
+    time64_to_tm(t.tv_sec, 0, &time);
+    year = 1900 + time.tm_year;
+    month = 1 + time.tm_mon;
+    day = time.tm_mday; /* day of the month */
+    hour = time.tm_hour;
+    min = time.tm_min;
+    sec = time.tm_sec;
+
+    userArray[0] = duration;
+    userArray[1] = year;
+    userArray[2] = month;
+    userArray[3] = day;
+    userArray[4] = hour;
+    userArray[5] = min;
+    userArray[6] = sec;
+
+    // ret = copy_to_user(buf, &duration, 4);                   /* Copy pulse duration to user space as 4 bytes (32 bits) */
+    ret = copy_to_user(buf, userArray, 4*7);
+    
+    // printk(KERN_INFO "hcsr04 read (count=%d, offset=%d)\n", (int)count, (int)*f_pos);
+
+    /* FIFO circular buffer for last 5 values. Could do this with a linked list.*/
+    circular_buf_put(handlePulse,duration);
+    circular_buf_put(handleYear,year);
+    circular_buf_put(handleMonth,month);
+    circular_buf_put(handleDay,day);
+    circular_buf_put(handleHour,hour);
+    circular_buf_put(handleMin,min);
+    circular_buf_put(handleSec,sec);
+
+    // return 4; /* 4 bytes are returned */
+    return 4*7;
+}
+
+/* Function executed when the user reads /sys/kernel/hcsr04/hcsr04 */
+static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
     ssize_t echo = 0;
     int i;
-    int j;
-    int k;
-    int k1;
     int circBufDistInt[CIRC_BUF_SIZE]; /* Integer part */
     int circBufDistDec[CIRC_BUF_SIZE]; /* Decimal part */
-    uint8_t dataPeekTest[CIRC_BUF_SIZE];
-    int r;
+    int dataPeekTest[CIRC_BUF_SIZE];
+    int dataPeekPulse[CIRC_BUF_SIZE];
+    int dataPeekYear[CIRC_BUF_SIZE];
+    int dataPeekMonth[CIRC_BUF_SIZE];
+    int dataPeekDay[CIRC_BUF_SIZE];
+    int dataPeekHour[CIRC_BUF_SIZE];
+    int dataPeekMin[CIRC_BUF_SIZE];
+    int dataPeekSec[CIRC_BUF_SIZE];
 
-    for (j=0;j<CIRC_BUF_SIZE;j++)
-    {
-        circBufDistInt[j] = circBufPulse[j]/58;
-        circBufDistDec[j] = ((1000*circBufPulse[j])/58)%1000; /* 3 decimal places */
+    circular_buf_peek(handlePulse, dataPeekPulse, CIRC_BUF_SIZE);
+    circular_buf_peek(handleYear, dataPeekYear, CIRC_BUF_SIZE);
+    circular_buf_peek(handleMonth, dataPeekMonth, CIRC_BUF_SIZE);
+    circular_buf_peek(handleDay, dataPeekDay, CIRC_BUF_SIZE);
+    circular_buf_peek(handleHour, dataPeekHour, CIRC_BUF_SIZE);
+    circular_buf_peek(handleMin, dataPeekMin, CIRC_BUF_SIZE);
+    circular_buf_peek(handleSec, dataPeekSec, CIRC_BUF_SIZE);
 
-    }
-
-    // // printk(KERN_INFO "Size of ssize_t is %d bytes in function %s\n", sizeof(ssize_t), __func__);
-
-    // /* Date calculation */
-    // duration = (int)ktime_to_us(ktime_sub(falling, rising));
-    // distance = duration / 58;
-
-    // /* Date and echo duration and distance output */
-    // // printk(KERN_INFO "%d:%d:%d:%ld\n", time.tm_hour, time.tm_min, time.tm_sec, t.tv_usec);
-    // echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d\n", day, month, year, hour, min, sec, duration, distance); /* Floating point operations are discouraged in Linux kernel */
-    // // printk(KERN_INFO "%s",buf);
-   
     for (i=0;i<CIRC_BUF_SIZE;i++)
     {
-        // printk(KERN_INFO "%d\n",circBufPulse[i]); /* Pulse duration */
-        // printk(KERN_INFO "%d.%d\n", circBufDistInt[i],circBufDistDec[i]); /* Pulse distance */
-        
-        /* Time stamp */
-        time64_to_tm(circBufTime[i].tv_sec, 0, &time);
-        year = 1900 + time.tm_year;
-        month = 1 + time.tm_mon;
-        day = time.tm_mday; /* day of the month */
-        hour = time.tm_hour;
-        min = time.tm_min;
-        sec = time.tm_sec;
-        // printk(KERN_INFO "%d-%d-%d  %d:%d:%d\n", day, month, year, hour, min, sec);
-
         if (i == 0)
         {
-            echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", day, month, year, hour, min, sec, circBufPulse[i], circBufDistInt[i],circBufDistDec[i]);
+            /* Distance done to 3 decimal places. Floating point operations are discouraged in Linux kernel. */
+            echo = sprintf(buf, "[%d-%d-%d| %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[i], dataPeekMonth[i],\
+             dataPeekYear[i], dataPeekHour[i], dataPeekMin[i], dataPeekSec[i], dataPeekPulse[i], dataPeekPulse[i]/58, ((1000*dataPeekPulse[i])/58)%1000);
         }
         else
         {
-            echo += sprintf(buf + echo, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", day, month, year, hour, min, sec, circBufPulse[i], circBufDistInt[i],circBufDistDec[i]);
+            echo += sprintf(buf + echo, "[%d-%d-%d| %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[i], dataPeekMonth[i],\
+             dataPeekYear[i], dataPeekHour[i], dataPeekMin[i], dataPeekSec[i], dataPeekPulse[i], dataPeekPulse[i]/58, ((1000*dataPeekPulse[i])/58)%1000);
         }
     }
 
-// echo = sprintf(buf, "[%d-%d-%d, %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d \
-//     [%d-%d-%d, %d:%d:%d]\n Pulse duration (us): %d, Distance (cm): %d.%d\n",\
-//     10, 12, 2012, 11, 11, 11, 300, 5, 5,
-//     23, 2, 2022, 12, 00, 00, 500, 4, 4);
 
-    for(k=0;k<(CIRC_BUF_SIZE+3);k++)
-    {
-        circular_buf_put(handle,k);
-    }
-
-    r = circular_buf_peek(handle, dataPeekTest, CIRC_BUF_SIZE);
-
-    for(k1=0;k1<CIRC_BUF_SIZE;k1++)
-    {
-        printk(KERN_INFO "peek: %d\n", dataPeekTest[k1]);
-    }
+    // for(k1=0;k1<CIRC_BUF_SIZE;k1++)
+    // {
+    //     printk(KERN_INFO "peek [%d-%d-%d | %d:%d:%d] Duration (us): %d, Distance (cm): %d\n", dataPeekDay[k1], dataPeekMonth[k1],\
+    //      dataPeekYear[k1], dataPeekHour[k1],  dataPeekMin[k1], dataPeekSec[k1], dataPeekPulse[k1], dataPeekPulse[k1]/58);
+    // }
 
     return echo;
-    // return sprintf(buf, "%d\n", hcsr04);
 }
 
 /* Function executed when the user writes /sys/kernel/hcsr04/hcsr04 */
