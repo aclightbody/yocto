@@ -27,7 +27,9 @@ int hcsr04_close(struct inode *inode, struct file *file);
 ssize_t hcsr04_write(struct file *filp, const char *buffer, size_t length, loff_t *offset);
 ssize_t hcsr04_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos);
 static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf);
+static ssize_t hcsr04_show_last5(struct kobject *kobj, struct kobj_attribute *attr, char *buf);
 static ssize_t hcsr04_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count);
+static ssize_t hcsr04_store_last5(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count);
 
 /* Declarations: circular buffer */ 
 typedef struct circular_buf_t circular_buf_t;
@@ -47,9 +49,12 @@ size_t circular_buf_size(cbuf_handle_t me);
 static dev_t hcsr04_dev;
 struct cdev hcsr04_cdev;    /* Data structure for character-communication-based device */
 static int hcsr04_lock = 0; /* Access lock to hcsr04 device */
-static struct kobject *hcsr04_kobject;
 static ktime_t rising, falling; /* Data structures to record rising and falling edge of echo pulse of hcsr04 device */
+
+/* Definitions: sysfs */
+static struct kobject *hcsr04_kobject;
 static struct kobj_attribute hcsr04_attribute = __ATTR(hcsr04, 0660, hcsr04_show, hcsr04_store); /* Kernel object attribute: _ATTR(filename,file access right (0666 is read write execute access), invoked function when file read, invoked function when file written) */
+static struct kobj_attribute hcsr04_attribute_last5 = __ATTR(hcsr04_last5, 0660, hcsr04_show_last5, hcsr04_store_last5); /* Kernel object attribute: _ATTR(filename,file access right (0666 is read write execute access), invoked function when file read, invoked function when file written) */
 #define CIRC_BUF_SIZE 5 /* Storing 5 echo values */
 
 /* Definitions: Circular buffer */
@@ -277,6 +282,7 @@ static int __init hcsr04_module_init(void)
     /* sysfs */
     hcsr04_kobject = kobject_create_and_add("hcsr04", kernel_kobj); /* Add hcsr04 directory in /sys/kernel */
     sysfs_create_file(hcsr04_kobject, &hcsr04_attribute.attr);      /* Add hcsr04 file in /sys/kernel/hcsr04 */
+    sysfs_create_file(hcsr04_kobject, &hcsr04_attribute_last5.attr);      /* Add hcsr04_last5 file in /sys/kernel/hcsr04 */
 
     handlePulse = circular_buf_init(fifoBufPulse,CIRC_BUF_SIZE);
     handleYear = circular_buf_init(fifoBufYear,CIRC_BUF_SIZE);
@@ -421,9 +427,36 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 {
     ssize_t echo = 0;
     int i;
-    int circBufDistInt[CIRC_BUF_SIZE]; /* Integer part */
-    int circBufDistDec[CIRC_BUF_SIZE]; /* Decimal part */
-    int dataPeekTest[CIRC_BUF_SIZE];
+    int dataPeekPulse[CIRC_BUF_SIZE];
+    int dataPeekYear[CIRC_BUF_SIZE];
+    int dataPeekMonth[CIRC_BUF_SIZE];
+    int dataPeekDay[CIRC_BUF_SIZE];
+    int dataPeekHour[CIRC_BUF_SIZE];
+    int dataPeekMin[CIRC_BUF_SIZE];
+    int dataPeekSec[CIRC_BUF_SIZE];
+
+    circular_buf_peek(handlePulse, dataPeekPulse, CIRC_BUF_SIZE);
+    circular_buf_peek(handleYear, dataPeekYear, CIRC_BUF_SIZE);
+    circular_buf_peek(handleMonth, dataPeekMonth, CIRC_BUF_SIZE);
+    circular_buf_peek(handleDay, dataPeekDay, CIRC_BUF_SIZE);
+    circular_buf_peek(handleHour, dataPeekHour, CIRC_BUF_SIZE);
+    circular_buf_peek(handleMin, dataPeekMin, CIRC_BUF_SIZE);
+    circular_buf_peek(handleSec, dataPeekSec, CIRC_BUF_SIZE);
+
+
+    /* Distance done to 3 decimal places. Floating point operations are discouraged in Linux kernel. */
+    echo = sprintf(buf, "[%d-%d-%d | %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[CIRC_BUF_SIZE-1], dataPeekMonth[CIRC_BUF_SIZE-1],\
+        dataPeekYear[CIRC_BUF_SIZE-1], dataPeekHour[CIRC_BUF_SIZE-1], dataPeekMin[CIRC_BUF_SIZE-1], dataPeekSec[CIRC_BUF_SIZE-1], dataPeekPulse[CIRC_BUF_SIZE-1],\
+         dataPeekPulse[CIRC_BUF_SIZE-1]/58, ((1000*dataPeekPulse[CIRC_BUF_SIZE-1])/58)%1000);
+
+    return echo;
+}
+
+/* Function executed when the user reads /sys/kernel/hcsr04/hcsr04 */
+static ssize_t hcsr04_show_last5(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+    ssize_t echo = 0;
+    int i;
     int dataPeekPulse[CIRC_BUF_SIZE];
     int dataPeekYear[CIRC_BUF_SIZE];
     int dataPeekMonth[CIRC_BUF_SIZE];
@@ -445,22 +478,15 @@ static ssize_t hcsr04_show(struct kobject *kobj, struct kobj_attribute *attr, ch
         if (i == 0)
         {
             /* Distance done to 3 decimal places. Floating point operations are discouraged in Linux kernel. */
-            echo = sprintf(buf, "[%d-%d-%d| %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[i], dataPeekMonth[i],\
+            echo = sprintf(buf, "[%d-%d-%d | %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[i], dataPeekMonth[i],\
              dataPeekYear[i], dataPeekHour[i], dataPeekMin[i], dataPeekSec[i], dataPeekPulse[i], dataPeekPulse[i]/58, ((1000*dataPeekPulse[i])/58)%1000);
         }
         else
         {
-            echo += sprintf(buf + echo, "[%d-%d-%d| %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[i], dataPeekMonth[i],\
+            echo += sprintf(buf + echo, "[%d-%d-%d | %d:%d:%d] Pulse duration (us): %d, Distance (cm): %d.%d\n", dataPeekDay[i], dataPeekMonth[i],\
              dataPeekYear[i], dataPeekHour[i], dataPeekMin[i], dataPeekSec[i], dataPeekPulse[i], dataPeekPulse[i]/58, ((1000*dataPeekPulse[i])/58)%1000);
         }
     }
-
-
-    // for(k1=0;k1<CIRC_BUF_SIZE;k1++)
-    // {
-    //     printk(KERN_INFO "peek [%d-%d-%d | %d:%d:%d] Duration (us): %d, Distance (cm): %d\n", dataPeekDay[k1], dataPeekMonth[k1],\
-    //      dataPeekYear[k1], dataPeekHour[k1],  dataPeekMin[k1], dataPeekSec[k1], dataPeekPulse[k1], dataPeekPulse[k1]/58);
-    // }
 
     return echo;
 }
@@ -472,6 +498,15 @@ static ssize_t hcsr04_store(struct kobject *kobj, struct kobj_attribute *attr, c
 
     return count;
 }
+
+/* Function executed when the user writes /sys/kernel/hcsr04/hcsr04 */
+static ssize_t hcsr04_store_last5(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+    // sscanf(buf, "%d\n", &hcsr04);
+
+    return count;
+}
+
 
 module_init(hcsr04_module_init);
 module_exit(hcsr04_module_cleanup);

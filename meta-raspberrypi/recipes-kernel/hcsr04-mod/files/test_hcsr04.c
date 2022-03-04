@@ -19,9 +19,16 @@ int main(int argc, char **argv)
     int d[7];
     int i;
     int iterConv;
+    char* arg1 = "1"; /* Pointer to default string. Allows for dynamic memory allocation of input */
+
+    if (argc > 1)
+    {
+        arg1 = (char*)malloc(strlen(argv[1] + 1)); /* Dynamically allocating memory depending on length of argv */
+        strcpy(arg1,argv[1]); /* Copying string in argv[1] to arg1 */
+    }
 
     errno = 0;
-    iterConv = strtol(argv[1], &ptr_end,10); /* Get argument at position 1 and convert string to int: base 10 */
+    iterConv = strtol(arg1, &ptr_end,10); /* Get argument at position 1 and convert string to int: base 10 */
 
     if(errno != 0 || *ptr_end != '\0' || iterConv > INT_MAX || iterConv < INT_MIN) /* End pointer = /0 */
     {
