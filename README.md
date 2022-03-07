@@ -16,7 +16,7 @@
   
   source poky/oe-init-build-env `<project name>`
 
-  e.g. source poky/oe-init-build-env build-rpi-lab3
+  e.g. source poky/oe-init-build-env build-rpi-cw
 
   bitbake -c clean rpi-test-image
 
