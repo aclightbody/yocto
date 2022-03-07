@@ -1,0 +1,1 @@
+../init.d/pi-blaster.boot.sh
