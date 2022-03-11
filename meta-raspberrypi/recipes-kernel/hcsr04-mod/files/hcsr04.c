@@ -189,7 +189,7 @@ size_t circular_buf_capacity(cbuf_handle_t me)
 }
 
 /* 
-circular_buf_put:Put continues to add data if the buffer is full. Old data is overwritten. 
+circular_buf_put: Adds data to the buffer.
 */
 void circular_buf_put(cbuf_handle_t me, int data)
 {
