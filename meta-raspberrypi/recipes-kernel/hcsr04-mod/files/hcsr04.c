@@ -46,7 +46,7 @@ size_t circular_buf_size(cbuf_handle_t me);
 
 /* Definitions: Sensor */
 // static int hcsr04 = 2; /* sys file variable */
-static dev_t hcsr04_dev;
+static dev_t hcsr04_dev; /* Creates the device file. Struct that contains module major and minor number. */
 struct cdev hcsr04_cdev;    /* Data structure for character-communication-based device */
 static int hcsr04_lock = 0; /* Access lock to hcsr04 device */
 static ktime_t rising, falling; /* Data structures to record rising and falling edge of echo pulse of hcsr04 device */
